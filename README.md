@@ -37,13 +37,18 @@ print("libbluray \(major).\(minor).\(micro)")
 
 ## How to Build
 
-Build the XCFrameworks locally (requires macOS with Xcode, `meson` >= 0.61, `ninja`, `autoconf`, `automake`, `libtool`, `pkg-config`, `flex` and `bison`):
+Build the XCFrameworks locally:
 
 ```sh
+./scripts/install-build-tools.sh   # optional: install pinned build tools
 ./scripts/build-xcframeworks.sh
 ```
 
-The script downloads pinned upstream source tarballs, verifies their SHA-256 checksums, compiles every library from source for `arm64` and `x86_64`, and writes `LibBluray.xcframework.zip`, `LibAACS.xcframework.zip`, `LibBDPlus.xcframework.zip` and `checksums.txt` into `dist/`.
+`scripts/install-build-tools.sh` installs the build tools BlueKit needs (`autoconf`, `automake`, `libtool`, `bison`, `meson` and `pkg.m4`) from pinned upstream sources into `/usr/local`. It is optional: the build script also uses the Homebrew versions of those tools when they are present.
+
+`scripts/build-xcframeworks.sh` downloads pinned upstream source tarballs, verifies their SHA-256 checksums, compiles every library from source for `arm64` and `x86_64`, and writes `LibBluray.xcframework.zip`, `LibAACS.xcframework.zip`, `LibBDPlus.xcframework.zip` and `checksums.txt` into `dist/`.
+
+Requirements: macOS with Xcode, plus `flex`, `ninja`, `pkg-config` and `ant` (all present on the GitHub macOS runner images).
 
 Releases are produced by GitHub Actions: push a tag matching `v*` (for example `v0.1.0`) and the [release workflow](.github/workflows/release.yml) builds the XCFrameworks on a macOS runner and publishes them as release assets.
 

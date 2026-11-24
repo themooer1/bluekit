@@ -376,6 +376,20 @@ build_libbluray() {
 autoreconf_project() {
   local src="$1"
   log "running autoreconf in $(basename "$src")"
+
+  # aclocal needs to find pkg.m4 (used by libaacs' configure.ac).
+  local d
+  for d in \
+      "${BLUEKIT_TOOLS_PREFIX:-}/share/aclocal" \
+      /usr/local/share/aclocal \
+      /opt/local/share/aclocal \
+      /usr/share/aclocal \
+      "$(brew --prefix pkgconf 2>/dev/null || true)/share/aclocal"; do
+    if [[ -n "$d" && -f "$d/pkg.m4" ]]; then
+      export ACLOCAL_PATH="${ACLOCAL_PATH:+$ACLOCAL_PATH:}$d"
+    fi
+  done
+
   ( cd "$src" && autoreconf -vif ) > "$src/autoreconf.log" 2>&1 \
     || { tail -40 "$src/autoreconf.log"; die "autoreconf failed for $src"; }
 }
@@ -546,12 +560,17 @@ EOF
 # Main
 # ---------------------------------------------------------------------------
 main() {
-  # Prefer modern Homebrew tools over the ones shipped with macOS (macOS has
-  # bison 2.3 and meson 0.59, both too old for these projects).
-  local formula
-  for formula in meson ninja pkg-config bison flex ant autoconf automake libtool; do
-    prefer_brew_formula "$formula"
-  done
+  # Prefer the tools installed by scripts/install-build-tools.sh, otherwise
+  # fall back to modern Homebrew tools (macOS ships an outdated meson 0.59 and
+  # bison 2.3, both too old for these projects).
+  if [[ -n "${BLUEKIT_TOOLS_PREFIX:-}" && -d "${BLUEKIT_TOOLS_PREFIX}/bin" ]]; then
+    PATH="${BLUEKIT_TOOLS_PREFIX}/bin:$PATH"
+  else
+    local formula
+    for formula in meson ninja pkg-config bison flex ant autoconf automake libtool; do
+      prefer_brew_formula "$formula"
+    done
+  fi
 
   for t in curl tar unzip zip shasum lipo install_name_tool meson ninja \
            pkg-config autoreconf automake libtool make flex bison clang; do

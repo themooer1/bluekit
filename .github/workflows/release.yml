@@ -31,26 +31,25 @@ jobs:
           xcrun --show-sdk-path
 
       - name: Install build tools
-        # Build-time only. Nothing from Homebrew ends up in the shipped
-        # artefacts - every dependency is compiled from source and linked
-        # statically into the shipped dynamic libraries.
+        # Build-time only, installed from pinned upstream sources so that the
+        # build does not depend on what a particular runner image happens to
+        # provide. Nothing installed here ends up in the shipped artefacts:
+        # every library is compiled from source and its permissive
+        # dependencies are linked statically into the shipped dynamic
+        # libraries.
         run: |
-          brew update || true
-          brew install meson ninja autoconf automake libtool pkg-config flex bison
-          for f in meson bison flex; do
-            prefix="$(brew --prefix "$f")"
-            echo "${prefix}/bin" >> "$GITHUB_PATH"
-          done
-          echo "PATH entries added for meson/bison/flex"
-          meson --version
-          bison --version | head -1
+          ./scripts/install-build-tools.sh "$RUNNER_TEMP/tools"
+          echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
 
       - name: Install Apache Ant (for libbluray BD-J support)
-        # Installed from the upstream binary distribution rather than Homebrew,
-        # because Homebrew's `ant` requires an arm64 OpenJDK and therefore does
-        # not install on Intel runners.
+        # The macOS runner images ship Apache Ant, but install it from the
+        # upstream binary distribution when it is missing.
         run: |
           set -euo pipefail
+          if command -v ant >/dev/null 2>&1; then
+            echo "ant already available: $(ant -version)"
+            exit 0
+          fi
           ANT_VERSION=1.10.15
           cd "$RUNNER_TEMP"
           curl -fsSL -O "https://archive.apache.org/dist/ant/binaries/apache-ant-${ANT_VERSION}-bin.tar.gz"
@@ -65,6 +64,8 @@ jobs:
           java-version: "17"
 
       - name: Build XCFrameworks
+        env:
+          BLUEKIT_TOOLS_PREFIX: ${{ runner.temp }}/tools
         run: ./scripts/build-xcframeworks.sh
 
       - name: Verify no external runtime dependencies
@@ -119,9 +120,11 @@ jobs:
             cat dist/checksums.txt
             echo '```'
             echo
-            echo "### Dependencies"
+            echo "### Artefacts"
             echo
-            echo "\`LibBluray.xcframework.zip\` \`LibAACS.xcframework.zip\` \`LibBDPlus.xcframework.zip\`"
+            echo "- \`LibBluray.xcframework.zip\`"
+            echo "- \`LibAACS.xcframework.zip\`"
+            echo "- \`LibBDPlus.xcframework.zip\`"
           } > "$notes"
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
