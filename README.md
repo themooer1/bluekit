@@ -33,6 +33,8 @@ print("libbluray \(major).\(minor).\(micro)")
 
 > **Note:** BlueKit contains no AACS keys and no proprietary decryption material. The AACS and BD+ libraries are shipped in their unmodified upstream state.
 
+> **BD-J:** when the release is built with a JDK and Apache Ant available, `libbluray` is compiled with BD-J support. The two BD-J jars are shipped next to `libbluray.dylib` inside `LibBluray.xcframework`, which is where `libbluray` looks for them at runtime. If you relocate the library, point `LIBBLURAY_CP` at the directory containing the jars.
+
 ## How to Build
 
 Build the XCFrameworks locally (requires macOS with Xcode, `meson` >= 0.61, `ninja`, `autoconf`, `automake`, `libtool`, `pkg-config`, `flex` and `bison`):

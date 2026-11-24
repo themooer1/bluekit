@@ -438,10 +438,10 @@ write_modulemap() {
   } > "$out"
 }
 
-# package_xcframework <libfile> <module> <dylib> <stage> <outdir> <header>...
+# package_xcframework <libfile> <module> <dylib> <stage> <outdir> <ship_jars> <header>...
 package_xcframework() {
-  local libfile="$1" module="$2" dylib="$3" stage="$4" outdir="$5"
-  shift 5
+  local libfile="$1" module="$2" dylib="$3" stage="$4" outdir="$5" ship_jars="$6"
+  shift 6
   local headers_rel=("$@")
 
   local bundle="$outdir/$module.xcframework"
@@ -459,6 +459,17 @@ package_xcframework() {
 
   write_modulemap "$contents/Headers/module.modulemap" "$module" "${headers_rel[@]}"
   cp "$dylib" "$contents/$libfile"
+
+  # libbluray's BD-J support loads its jars from the directory the library
+  # was loaded from, so ship them next to the dylib.
+  if [[ "$ship_jars" == "yes" && -d "$stage/share/java" ]]; then
+    local jar
+    for jar in "$stage/share/java"/*.jar; do
+      [[ -e "$jar" ]] || continue
+      cp "$jar" "$contents/"
+      log "shipping $(basename "$jar") next to $libfile"
+    done
+  fi
 
   cat > "$bundle/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -508,6 +519,12 @@ EOF
       if [[ -n "$newcontents" ]]; then
         mkdir -p "$newcontents/Headers"
         cp "$contents/Headers/module.modulemap" "$newcontents/Headers/module.modulemap"
+        # Keep the BD-J jars next to the library.
+        local jar
+        for jar in "$contents"/*.jar; do
+          [[ -e "$jar" ]] || continue
+          cp "$jar" "$newcontents/"
+        done
         rm -rf "$bundle"
         mv "$tmp" "$bundle"
       else
@@ -628,17 +645,17 @@ main() {
   rm -f "$DIST_DIR"/*.xcframework.zip "$DIST_DIR/checksums.txt"
 
   package_xcframework "libbluray.dylib" "LibBluray" "$combined/libbluray.dylib" \
-      "$BUILD_DIR/stage-arm64" "$DIST_DIR" \
+      "$BUILD_DIR/stage-arm64" "$DIST_DIR" yes \
       libbluray/bluray.h libbluray/overlay.h libbluray/keys.h libbluray/meta_data.h \
       libbluray/filesystem.h libbluray/log_control.h libbluray/player_settings.h \
       libbluray/clpi_data.h libbluray/bluray-version.h libbluray/util/attributes.h
 
   package_xcframework "libaacs.dylib" "LibAACS" "$combined/libaacs.dylib" \
-      "$BUILD_DIR/stage-arm64" "$DIST_DIR" \
+      "$BUILD_DIR/stage-arm64" "$DIST_DIR" no \
       libaacs/aacs.h libaacs/aacs-version.h libaacs/filesystem.h
 
   package_xcframework "libbdplus.dylib" "LibBDPlus" "$combined/libbdplus.dylib" \
-      "$BUILD_DIR/stage-arm64" "$DIST_DIR" \
+      "$BUILD_DIR/stage-arm64" "$DIST_DIR" no \
       libbdplus/bdplus.h libbdplus/bdplus-version.h
 
   # ---------------------------------------------------------------------
