@@ -1,0 +1,15 @@
+# Build artefacts
+build/
+dist/
+*.xcframework
+*.xcframework.zip
+
+# Xcode
+.DS_Store
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Swift
+.build/
+.swiftpm/
+Package.resolved

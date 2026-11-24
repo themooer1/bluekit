@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish a release for (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build XCFrameworks and publish release
+    runs-on: macos-14
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          xcrun --show-sdk-path
+
+      - name: Install build tools
+        # Build-time only. Nothing from Homebrew ends up in the shipped
+        # artefacts - every dependency is compiled from source and linked
+        # statically into the shipped dynamic libraries.
+        run: |
+          brew update || true
+          brew install meson ninja autoconf automake libtool pkg-config flex bison
+          echo "/usr/local/opt/meson/bin" >> "$GITHUB_PATH"
+          echo "/usr/local/opt/bison/bin" >> "$GITHUB_PATH"
+          echo "/usr/local/opt/flex/bin" >> "$GITHUB_PATH"
+          meson --version
+          bison --version | head -1
+
+      - name: Install Apache Ant (for libbluray BD-J support)
+        # Installed from the upstream binary distribution rather than Homebrew,
+        # because Homebrew's `ant` requires an arm64 OpenJDK and therefore does
+        # not install on Intel runners.
+        run: |
+          set -euo pipefail
+          ANT_VERSION=1.10.15
+          cd "$RUNNER_TEMP"
+          curl -fsSL -O "https://archive.apache.org/dist/ant/binaries/apache-ant-${ANT_VERSION}-bin.tar.gz"
+          echo "71334d7e5d98cfe53d6c429a648a5021137a967378667306c5f613dff5180506  apache-ant-${ANT_VERSION}-bin.tar.gz" | shasum -a 256 -c -
+          tar xzf "apache-ant-${ANT_VERSION}-bin.tar.gz"
+          echo "${RUNNER_TEMP}/apache-ant-${ANT_VERSION}/bin" >> "$GITHUB_PATH"
+
+      - name: Set up JDK (for libbluray BD-J support)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build XCFrameworks
+        run: ./scripts/build-xcframeworks.sh
+
+      - name: Verify no external runtime dependencies
+        run: |
+          set -euo pipefail
+          rm -rf verify && mkdir verify
+          for z in dist/*.xcframework.zip; do
+            unzip -q "$z" -d verify
+          done
+          failed=0
+          for dylib in $(find verify -name '*.dylib'); do
+            echo "== $dylib"
+            lipo -info "$dylib"
+            otool -L "$dylib"
+            if otool -L "$dylib" | grep -E '/opt/homebrew|/usr/local|/opt/local'; then
+              echo "::error::external Homebrew/local dependency found in $dylib"
+              failed=1
+            fi
+          done
+          [ "$failed" -eq 0 ] || exit 1
+          # Every dylib must be a universal binary.
+          for dylib in $(find verify -name '*.dylib'); do
+            archs="$(lipo -archs "$dylib")"
+            case "$archs" in
+              *arm64*x86_64*|*x86_64*arm64*) ;;
+              *) echo "::error::$dylib is not universal: $archs"; exit 1 ;;
+            esac
+          done
+
+      - name: Upload build artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcframeworks
+          path: dist/
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          notes="$(mktemp)"
+          {
+            echo "## BlueKit $TAG"
+            echo
+            echo "Prebuilt macOS XCFrameworks for the native C libraries used to read,"
+            echo "navigate and interact with Blu-ray discs (arm64 + x86_64, macOS 13+)."
+            echo
+            echo "### SwiftPM checksums"
+            echo
+            echo '```'
+            cat dist/checksums.txt
+            echo '```'
+            echo
+            echo "### Dependencies"
+            echo
+            echo "\`LibBluray.xcframework.zip\` \`LibAACS.xcframework.zip\` \`LibBDPlus.xcframework.zip\`"
+          } > "$notes"
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "BlueKit $TAG" \
+            --notes-file "$notes" \
+            dist/*.xcframework.zip dist/checksums.txt \
+            || gh release upload "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              dist/*.xcframework.zip dist/checksums.txt
