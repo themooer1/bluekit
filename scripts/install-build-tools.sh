@@ -29,6 +29,7 @@ die() { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
 
 # name|version|url|sha256
 TOOLS=(
+  "m4|1.4.19|https://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.xz|63aede5c6d33b6d9b13511cd0be2cac046f2e70fd0a07aa9573a04a82783af96"
   "autoconf|2.72|https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.xz|ba885c1319578d6c94d46e9b0dceb4014caafe2490e437a0dbca3f270a223f5a"
   "automake|1.17|https://ftp.gnu.org/gnu/automake/automake-1.17.tar.xz|8920c1fc411e13b90bf704ef9db6f29d540e76d232cb3b2c9f4dc4cc599bd990"
   "libtool|2.5.4|https://ftp.gnu.org/gnu/libtool/libtool-2.5.4.tar.xz|f81f5860666b0bc7d84baddefa60d1cb9fa6fceb2398cc3baca6afaa60266675"
@@ -56,6 +57,10 @@ done
 export PATH="$TOOLCHAIN_BIN:$PATH"
 export AR="$TOOLCHAIN_BIN/ar"
 export RANLIB="$TOOLCHAIN_BIN/ranlib"
+
+# The tools we install have to be visible to each other: autoconf and bison
+# both need the GNU m4 that is built first.
+export PATH="$PREFIX/bin:$PATH"
 
 install_tool() {
   local name="$1" version="$2" url="$3" sha="$4"
