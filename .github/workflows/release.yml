@@ -126,11 +126,25 @@ jobs:
             echo "- \`LibAACS.xcframework.zip\`"
             echo "- \`LibBDPlus.xcframework.zip\`"
           } > "$notes"
-          gh release create "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "BlueKit $TAG" \
-            --notes-file "$notes" \
-            dist/*.xcframework.zip dist/checksums.txt \
-            || gh release upload "$TAG" \
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # The release already exists (re-run): replace the assets and
+            # publish it.
+            gh release upload "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
+              --clobber \
               dist/*.xcframework.zip dist/checksums.txt
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "BlueKit $TAG" \
+              --notes-file "$notes" \
+              --draft=false
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "BlueKit $TAG" \
+              --notes-file "$notes" \
+              dist/*.xcframework.zip dist/checksums.txt
+          fi
+
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,isDraft,assets
