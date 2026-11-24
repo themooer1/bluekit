@@ -36,19 +36,19 @@ let package = Package(
         .binaryTarget(
             name: "LibBluray",
             url: "https://github.com/themooer1/bluekit/releases/download/v0.1.0/LibBluray.xcframework.zip",
-            checksum: "REPLACE_WITH_LibBluray_CHECKSUM"
+            checksum: "661a4ca6032bda2c8406e452db0c6664b764132374d7b6286f2ab2a6d92a8c98"
         ),
         // Dynamic library wrapping libaacs.
         .binaryTarget(
             name: "LibAACS",
             url: "https://github.com/themooer1/bluekit/releases/download/v0.1.0/LibAACS.xcframework.zip",
-            checksum: "REPLACE_WITH_LibAACS_CHECKSUM"
+            checksum: "9678a9b2c8730208609b074a0a4483e775162f7b2218c2532cc8a3345a6b9160"
         ),
         // Dynamic library wrapping libbdplus.
         .binaryTarget(
             name: "LibBDPlus",
             url: "https://github.com/themooer1/bluekit/releases/download/v0.1.0/LibBDPlus.xcframework.zip",
-            checksum: "REPLACE_WITH_LibBDPlus_CHECKSUM"
+            checksum: "ae34405393b9d9857514c765fede0c2fd4ffcb89de18e3f82c6e265f42536c0a"
         ),
         // Thin Swift umbrella that re-exports the C modules.
         .target(
