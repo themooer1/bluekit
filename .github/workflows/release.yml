@@ -16,7 +16,9 @@ permissions:
 jobs:
   build:
     name: Build XCFrameworks and publish release
-    runs-on: macos-14
+    # macOS 15 on Intel. The script cross-compiles arm64 from this runner, so
+    # the same code path is used for both architectures.
+    runs-on: macos-15-intel
 
     steps:
       - name: Check out repository
@@ -35,9 +37,11 @@ jobs:
         run: |
           brew update || true
           brew install meson ninja autoconf automake libtool pkg-config flex bison
-          echo "/usr/local/opt/meson/bin" >> "$GITHUB_PATH"
-          echo "/usr/local/opt/bison/bin" >> "$GITHUB_PATH"
-          echo "/usr/local/opt/flex/bin" >> "$GITHUB_PATH"
+          for f in meson bison flex; do
+            prefix="$(brew --prefix "$f")"
+            echo "${prefix}/bin" >> "$GITHUB_PATH"
+          done
+          echo "PATH entries added for meson/bison/flex"
           meson --version
           bison --version | head -1
 
